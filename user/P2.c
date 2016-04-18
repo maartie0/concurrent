@@ -26,9 +26,8 @@ void P2() {
       printInt(r);
       write(0,c,1);
     }
-    yield();
+    //yield();
   }
-
   return;
 }
 

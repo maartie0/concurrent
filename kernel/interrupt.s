@@ -5,6 +5,9 @@
 	
 handler_rst: bl    table_copy              @ initialise interrupt vector table
 
+             msr   cpsr, #0xD2             @ enter IRQ mode with no interrupts -- should this be that ? 
+             ldr   sp, =tos_irq            @ initialise IRQ mode stack
+
              msr   cpsr, #0xD3             @ enter SVC mode with no interrupts
              ldr   sp, =tos_svc            @ initialise SVC mode stack
 
@@ -36,6 +39,22 @@ handler_svc: sub   lr, lr, #0              @ correct return address
              add   sp, sp, #60             @ update SVC mode SP
              movs  pc, lr                  @ return from interrupt
 
+handler_irq: sub   lr, lr, #4              @ correct return address
+             sub   sp, sp, #60             @ update IRQ mode stack
+             stmia sp, { r0-r12, sp, lr }^ @ store  USR registers -- hat : get usr modereg lr diff to 1 up by 2 lines 
+             mrs   r0, spsr                @ get    USR        CPSR
+             stmfd sp!, { r0, lr }         @ save    caller-save registers
+
+             mov   r0, sp                  @ set    C function arg. = SP r0 return r1 arg -- here no return hence arg set to r0 
+             bl    kernel_handler_irq      @ invoke C function
+
+             ldmia sp!, { r0, lr }         @ load   USR mode PC and CPSR 
+             msr   spsr, r0                @ set    USR mode        CPSR
+             ldmia sp, { r0-r12, sp, lr }^ @ load   USR mode registers
+             add   sp, sp, #60             @ update SVC mode SP
+             movs  pc, lr                  @ return from interrupt
+
+
 /* The following captures the interrupt vector table, plus a function
  * to copy it into place (which is called on reset): note that 
  * 
@@ -52,11 +71,12 @@ table_data:  ldr   pc, address_rst         @ reset                 vector -> SVC
              b     .                       @ abort (prefetch)      vector -> ABT mode
              b     .                       @ abort     (data)      vector -> ABT mode
              b     .                       @ reserved
-             b     .                       @ IRQ                   vector -> IRQ mode
+             ldr   pc, address_irq         @ IRQ                   vector -> IRQ mode
              b     .                       @ FIQ                   vector -> FIQ mode
 
 address_rst: .word handler_rst
 address_svc: .word handler_svc
+address_irq: .word handler_irq 
  
 table_copy:  mov   r0, #0                  @ set destination address
              ldr   r1, =table_data         @ set source      address

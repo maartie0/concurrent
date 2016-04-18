@@ -34,7 +34,7 @@ void P1() {
         write(0,d,1);
       }
     }
-    yield();
+    //yield();
   }
 
   return;

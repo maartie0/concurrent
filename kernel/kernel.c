@@ -29,6 +29,30 @@ void scheduler( ctx_t* ctx ) {
 }
 
 void kernel_handler_rst( ctx_t* ctx              ) { 
+
+
+	/* Configure the mechanism for interrupt handling by
+5 *
+6 * - configuring timer st. it raises a ( periodic) interrupt for each
+7 * timer tick ,
+8 * - configuring GIC st. the selected interrupts are forwarded to the
+9 * processor via the IRQ interrupt signal , then
+10 * - enabling IRQ interrupts .
+11 */
+
+  TIMER0 -> Timer1Load = 0x00100000 ; // select period = 2^20 ticks ~= 1 sec
+  TIMER0 -> Timer1Ctrl = 0x00000002 ; // select 32-bit timer
+  TIMER0 -> Timer1Ctrl |= 0x00000040 ; // select periodic timer
+  TIMER0 -> Timer1Ctrl |= 0x00000020 ; // enable timer interrupt
+  TIMER0 -> Timer1Ctrl |= 0x00000080 ; // enable timer
+
+  GICC0 ->PMR = 0x000000F0 ; // unmask all interrupts
+  GICD0 -> ISENABLER [ 1 ] |= 0x00000010 ; // enable timer interrupt
+  GICC0 ->CTLR = 0x00000001 ; // enable GIC interface
+  GICD0 ->CTLR = 0x00000001 ; // enable GIC distributor
+
+  
+
   /* Initialise PCBs representing processes stemming from execution of
    * the two user programs.  Note in each case that
    *    
@@ -50,7 +74,7 @@ void kernel_handler_rst( ctx_t* ctx              ) {
   pcb[ 1 ].ctx.sp   = ( uint32_t )(  &tos_P1 );
 
   memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );
-  pcb[ 2 ].pid      = 1;
+  pcb[ 2 ].pid      = 2; //changed from 1 to 2 when it worked so might have to change to 1 again if breaks
   pcb[ 2 ].ctx.cpsr = 0x50;
   pcb[ 2 ].ctx.pc   = ( uint32_t )( entry_P2 );
   pcb[ 2 ].ctx.sp   = ( uint32_t )(  &tos_P2 );
@@ -60,6 +84,8 @@ void kernel_handler_rst( ctx_t* ctx              ) {
    */
 
   current = &pcb[ 0 ]; memcpy( ctx, &current->ctx, sizeof( ctx_t ) );
+
+  irq_enable ();
 
   return;
 }
@@ -90,10 +116,51 @@ void kernel_handler_svc( ctx_t* ctx, uint32_t id ) {
       ctx->gpr[ 0 ] = n;
       break;
     }
+    case 0x02 : {
+    	char* x = ( char*   )( ctx->gpr[ 0 ] );
+
+    	int i = 0;
+    	int reading = 1;
+
+    	while(reading){
+    		x[i] = PL011_getc( UART0 );
+    		if(x[i] == '\r'){
+    			reading = 0;
+    		}
+    		PL011_putc(UART0,x[i]);
+    		i++;
+    	}
+    	ctx -> gpr[ 0 ] = i - 1; 
+    	PL011_putc(UART0,'\n');
+    	break;
+    }
     default   : { // unknown
-      break;
+      break; 
     }
   }
 
   return;
 }
+
+void kernel_handler_irq( ctx_t* ctx 		){
+	// Read interrupt Id
+	uint32_t id = GICC0 -> IAR;
+
+	// Handle interrupt then reset Timer
+	if ( id == GIC_SOURCE_TIMER0 ) {
+		//PL011_putc( UART0, 'T' );
+		//age_Time +=1 ;
+		
+		/*if ( age_Time >= max_Age ) {
+			age_process();
+			age_Time = 0;
+		} */
+
+		scheduler( ctx ); 
+		TIMER0 -> Timer1IntClr = 0x01;
+	}
+
+	GICC0 -> EOIR = id;
+}
+
+

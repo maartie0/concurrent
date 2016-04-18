@@ -19,6 +19,19 @@ int write( int fd, void* x, size_t n ) {
   return r;
 }
 
+int read(void* x){
+  int r;
+
+  asm volatile( "mov r0, %1 \n"
+                "svc #2     \n"
+                "mov %0, r0 \n" 
+              : "=r" (r) 
+              : "r" (x)
+              : "r0" );
+
+  return r;
+}
+
 void printInt(int x){
 
 	int num = x;
