@@ -19,6 +19,8 @@
 #include "P0.h"
 #include "P1.h"
 #include "P2.h"
+#include "shell.h"
+#include "idle.h"
 
 /* The kernel source code is made simpler by three type definitions:
  *
@@ -39,6 +41,8 @@ typedef int pid_t;
 typedef struct {
   pid_t pid;
   ctx_t ctx;
+  int priority;
+  int available;
 } pcb_t;
 
 #endif

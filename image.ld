@@ -15,6 +15,12 @@ SECTIONS {
   /* allocate stack for svc mode */
   .       = . + 0x00001000;  
   tos_svc = .;
+  /* allocate stack for idle       */
+  .       = . + 0x00001000;  
+  tos_idle  = .;
+  /* allocate stack for shell       */
+  .       = . + 0x00001000;  
+  tos_shell  = .;
   /* allocate stack for P0       */
   .       = . + 0x00001000;  
   tos_P0  = .;

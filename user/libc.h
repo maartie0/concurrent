@@ -14,4 +14,10 @@ int read(void* x);
 
 void printInt(int x);
 
+int fork();
+
+void P0();
+void P1();
+void P2();
+
 #endif

@@ -32,6 +32,16 @@ int read(void* x){
   return r;
 }
 
+int fork(){
+  int r;
+
+  asm volatile( "svc #3     \n"
+                "mov %0, r0 \n" 
+              : "=r" (r));
+
+  return r;
+}
+
 void printInt(int x){
 
 	int num = x;
