@@ -23,11 +23,17 @@ SECTIONS {
   tos_shell  = .;
   /* allocate stack for P0       */
   .       = . + 0x00001000;  
-  tos_P0  = .;
+  tos_0  = .;
   /* allocate stack for P1       */
   .       = . + 0x00001000;  
-  tos_P1  = .;
+  tos_1  = .;
   /* allocate stack for P2       */
   .       = . + 0x00001000;  
-  tos_P2  = .;
+  tos_2  = .;
+  /* allocate stack for P2       */
+  .       = . + 0x00001000;  
+  tos_3  = .;
+  /* allocate stack for P2       */
+  .       = . + 0x00001000;  
+  tos_4  = .;
 }

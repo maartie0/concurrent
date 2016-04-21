@@ -45,7 +45,7 @@ handler_irq: sub   lr, lr, #4              @ correct return address
              mrs   r0, spsr                @ get    USR        CPSR
              stmfd sp!, { r0, lr }         @ save    caller-save registers
 
-             mov   r0, sp                  @ set    C function arg. = SP r0 return r1 arg -- here no return hence arg set to r0 
+             mov   r0, sp                  @ set    C function arg. = SP
              bl    kernel_handler_irq      @ invoke C function
 
              ldmia sp!, { r0, lr }         @ load   USR mode PC and CPSR 

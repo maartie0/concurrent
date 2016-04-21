@@ -22,6 +22,12 @@
 #include "shell.h"
 #include "idle.h"
 
+extern uint32_t tos_0;
+extern uint32_t tos_1;
+extern uint32_t tos_2;
+extern uint32_t tos_3;
+extern uint32_t tos_4;
+
 /* The kernel source code is made simpler by three type definitions:
  *
  * - a type that captures each component of an execution context (i.e.,
@@ -46,3 +52,9 @@ typedef struct {
 } pcb_t;
 
 #endif
+
+
+
+
+
+

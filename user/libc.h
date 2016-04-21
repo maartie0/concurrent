@@ -16,8 +16,11 @@ void printInt(int x);
 
 int fork();
 
+void exit();
+
 void P0();
 void P1();
 void P2();
+void idle();
 
 #endif

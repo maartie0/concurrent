@@ -42,6 +42,10 @@ int fork(){
   return r;
 }
 
+void exit(){
+  asm volatile( "svc #4     \n");
+}
+
 void printInt(int x){
 
 	int num = x;
