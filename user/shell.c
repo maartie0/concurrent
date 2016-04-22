@@ -1,5 +1,7 @@
 #include "shell.h"
 
+void clear_string(char* x);
+
 int compare_strings(char* x,char* y){
   if (x[0] == '\r') return 0;
   int i = 0;
@@ -36,43 +38,44 @@ void test(){
 
 }
 
+void clear_string(char* x){
+  for (int i = 0; i < 50; i++)
+  {
+    x[i] = '.';
+  }
+}
+
 
 void shell() {
   
   //test();
   while(1){
     char array[50];
+    write(0,"\n> ",3);
     int length = read(&array);
-    if(compare_strings(array,"idle")){
-      int pid = fork();
-      if(pid == -1){
-        while(1){
-          idle();
-        }
-      }
-    }
     if(compare_strings(array,"p0")){
       int pid = fork();
       if(pid == -1){
         P0();
-        // exit();
+        exit();
       }
     }
     if(compare_strings(array,"p1")){
       int pid = fork();
       if(pid == -1){
         P1();
-        // exit();
+        exit();
       }
     }
     if(compare_strings(array,"p2")){
       int pid = fork();
       if(pid == -1){
         P2();
-        // exit();
+        exit();
       }
     }
-    yield(); 
+    clear_string(array);
+    yield();
   }
     
   

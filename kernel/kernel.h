@@ -49,6 +49,8 @@ typedef struct {
   ctx_t ctx;
   int priority;
   int available;
+  int age;
+  int max_age;
 } pcb_t;
 
 #endif

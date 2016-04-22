@@ -11,7 +11,7 @@ uint32_t weight( uint32_t x ) {
 }
 
 void P2() {
-  while( 1 ) {
+  // while( 1 ) {
     char* y = "hello world, I'm P2\n";
     char* a = "weight( ";
     char* b = " ) = ";
@@ -27,7 +27,7 @@ void P2() {
       write(0,c,1);
     }
     //yield();
-  }
+  // }
   return;
 }
 
