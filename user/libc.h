@@ -14,13 +14,16 @@ int read(void* x);
 
 void printInt(int x);
 
-int fork();
+int fork(int id);
 
 void exit();
+
+void kill(int x);
 
 void P0();
 void P1();
 void P2();
 void idle();
+int get_status(void* x);
 
 #endif

@@ -1,6 +1,16 @@
 #include "shell.h"
 
 void clear_string(char* x);
+void wait();
+char array[50];
+char status[50];
+
+void wait(){
+  for( uint32_t x = ( 1 << 8 ); x < ( 1 << 28); x++ )
+  {
+    asm volatile ( "nop     \n");
+  }
+}
 
 int compare_strings(char* x,char* y){
   if (x[0] == '\r') return 0;
@@ -50,33 +60,75 @@ void shell() {
   
   //test();
   while(1){
-    char array[50];
+    
     write(0,"\n> ",3);
     int length = read(&array);
     if(compare_strings(array,"p0")){
-      int pid = fork();
+      int pid = fork(0);
       if(pid == -1){
         P0();
         exit();
+      }else if(pid == -2){
+        write(0,"can't add another process right now, please delete a running process\n",69);
+        wait();
       }
     }
     if(compare_strings(array,"p1")){
-      int pid = fork();
+      int pid = fork(1);
       if(pid == -1){
         P1();
         exit();
+      }else if(pid == -2){
+        write(0,"can't add another process right now, please delete a running process\n",69);
+        wait();
       }
     }
     if(compare_strings(array,"p2")){
-      int pid = fork();
+      int pid = fork(2);
       if(pid == -1){
         P2();
         exit();
+      }else if(pid == -2){
+        write(0,"can't add another process right now, please delete a running process\n",69);
+        wait();
       }
     }
+    if(compare_strings(array,"status")){
+      int stat = get_status(status);
+      for (int i = 0; i < stat; i++)
+      {
+        if(status[i] == '1'){
+           write(0,"PROCESS ",8);
+           printInt(i);
+           write(0," IS RUNNING\n",12);
+        }else{
+           write(0,"PROCESS ",8);
+           printInt(i);
+           write(0," IS NOT RUNNING\n",16);
+        }
+      }
+      wait();
+      clear_string(status);
+    }
+    if(compare_strings(array,"kill process 0")){
+        kill(0);
+    }
+    if(compare_strings(array,"kill process 1")){
+        kill(1);
+      }
+    if(compare_strings(array,"kill process 2")){
+        kill(2);
+      }
+    if(compare_strings(array,"kill process 3")){
+        kill(3);
+      }
+    if(compare_strings(array,"kill process 4")){
+        kill(4);
+      }
     clear_string(array);
     yield();
   }
+  
     
   
     

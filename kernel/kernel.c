@@ -1,7 +1,8 @@
 #include "kernel.h"
 
+void kill_process(int x);
 void create_shell();
-int create_process_child(uint32_t parent_pid,ctx_t* ctx);
+int create_process_child(uint32_t parent_pid,ctx_t* ctx,int x);
 void create_empty_processes();
 int get_available_pid();
 void initialise_stack_locations();
@@ -11,6 +12,8 @@ void initialise_input();
 void print(char* x,int n);
 void make_1(uint32_t parent_pid, ctx_t* ctx);
 void initialise_input();
+int get_next_lowest_priority(int current_pid,int last_prior);
+int get_highest_priority();
 void shell_yield();
 void scheduler(ctx_t* ctx);
 int get_next_process_pid();
@@ -18,6 +21,7 @@ int age_process();
 
 uint32_t stack_locations[5];
 pcb_t pcb_shell;
+int prior[3] = {1,5,8};
 int total_processes = 5;
 pcb_t pcb[ 5 ], *current = NULL;
 
@@ -63,15 +67,20 @@ void kernel_handler_svc( ctx_t* ctx, uint32_t id ) {
     	int i = 0;
     	int reading = 1;
 
-    	while(reading){
-    		x[i] = PL011_getc( UART0 );
-    		if(x[i] == '\r'){
-    			reading = 0;
-    		}
-    		PL011_putc(UART0,x[i]);
-    		i++;
-    	}
-
+      while(reading){         
+        x[i] = PL011_getc( UART0 );         
+        if(x[i] =='\r'){           
+          reading = 0;         
+        }else if (x[ i ] == '\177'){
+          PL011_putc( UART0, '\b' );           
+          PL011_putc( UART0, ' ' );
+          PL011_putc( UART0, '\b' );           
+          i--;         
+        } else{
+          PL011_putc(UART0,x[i]);           
+          i++;         
+        }       
+      }
     	ctx -> gpr[ 0 ] = i - 1; 
     	PL011_putc(UART0,'\n');
     	break;
@@ -79,7 +88,8 @@ void kernel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
 
     case 0x03 : { //fork
-    	int pid = create_process_child(current->pid,ctx);
+      int x = ( int  )( ctx->gpr[ 0 ] );
+    	int pid = create_process_child(current->pid,ctx,x);
       //todo put pid in gpr
     	ctx -> gpr[ 0 ] = pid;
       break;
@@ -88,14 +98,32 @@ void kernel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
     case 0x04 : { //exit
       int current_pid = current->pid;
-      memset( &pcb[current_pid], 0, sizeof( pcb_t ) );
+      // memset( &pcb[current_pid].ctx - sizeof(ctx_t), 0, sizeof( ctx_t ) );
       pcb[current_pid].available = 1;
       scheduler(ctx);
-      pcb[current_pid].pid  = 0;
-      pcb[current_pid].ctx.cpsr = 0;
-      pcb[current_pid].ctx.pc   = 0 ;
-      pcb[current_pid].ctx.sp   = 0;
-      pcb[current_pid].priority  = 0;
+      kill_process(current_pid);
+      break;
+    }
+
+    case 0x05 : { //get_status
+      char* x = ( char*   )( ctx->gpr[ 0 ] );
+      int i = 0;
+      for (i; i < total_processes; i++)
+      {
+        if(pcb[i].available == 0) x[i] = '1';
+        else x[i] = '0';
+      }
+      x[i+1] = '\0';
+
+
+      ctx -> gpr[ 0 ] = total_processes; 
+      break;
+    }
+    case 0x06 : { // kill
+      int x = (int) ctx->gpr[ 0 ];
+      // memset( &pcb[x].ctx - sizeof(ctx_t), 0, sizeof( ctx_t ) );
+      pcb[x].available = 1;
+      kill_process(x);
       break;
     }
     default   : { // unknown
@@ -104,6 +132,16 @@ void kernel_handler_svc( ctx_t* ctx, uint32_t id ) {
   }
 
   return;
+}
+
+void kill_process(int pid){
+  pcb[pid].pid  = 0;
+  pcb[pid].ctx.cpsr = 0;
+  pcb[pid].ctx.pc   = 0 ;
+  pcb[pid].ctx.sp   = 0;
+  pcb[pid].priority  = 0;
+  pcb[pid].age  = 0;
+  pcb[pid].max_age  = 0;
 }
 
 
@@ -121,7 +159,7 @@ void kernel_handler_irq( ctx_t* ctx 		){
 		TIMER0 -> Timer1IntClr = 0x01;
 	}
   else if(id == GIC_SOURCE_UART0){
-
+    PL011_getc(UART0);
      PL011_putc(UART0,'\n');
     // print("$bash: ",7);
     int current_pid = current->pid;
@@ -159,21 +197,6 @@ void scheduler( ctx_t* ctx ) {
     return;
   }
 
-
-  /*if(running == 0 || current_pid == -1){
-    memcpy( &pcb[ current_pid ].ctx, ctx, sizeof( ctx_t ) );
-    memcpy( ctx, &pcb_shell.ctx, sizeof( ctx_t ) );
-    current = &pcb_shell;
-  }else if(pcb[current_pid + 1].available == 0 && current_pid >= 0){
-     memcpy( &pcb[ current_pid ].ctx, ctx, sizeof( ctx_t ) );
-     memcpy( ctx, &pcb[ current_pid + 1 ].ctx, sizeof( ctx_t ) );
-     current = &pcb[ current_pid + 1 ];
-  }else{
-     memcpy( &pcb[ current_pid ].ctx, ctx, sizeof( ctx_t ) );
-     memcpy( ctx, &pcb[ 0 ].ctx, sizeof( ctx_t ) );
-     current = &pcb[ 0 ];
-  }*/
-
 }
 
 void initialise_stack_locations(){
@@ -200,12 +223,11 @@ void print(char* x,int n){
 
 void shell_yield(ctx_t* ctx){
     int pid = get_next_process_pid();
-    if(get_running_processes_number() != 0 && pid != -1){
+    if(pid != -1){
       memcpy( &pcb_shell.ctx, ctx, sizeof( ctx_t ) );
       memcpy( ctx, &pcb[ pid ].ctx, sizeof( ctx_t ) );
       current = &pcb[ pid ];
     }
-    
 }
 
 int get_available_pid(){
@@ -238,36 +260,94 @@ int age_process(){
   }
 }
 
+// int get_next_process_pid(){
+//   int volatile best = -1;
+//   int volatile pid;
+//   for (int i = 0; i < total_processes; i++)
+//   {
+//     if(pcb[i].available == 0){
+//       if(pcb[i].priority - pcb[i].age>= best){
+//         best = pcb[i].priority - pcb[i].age;
+//         pid = i;
+//       }
+//     }
+//   }
+//   if(best == -1) return -1;
+//   else return pid;
+// }
+
 int get_next_process_pid(){
-  int best = 0;
-  int pid;
+  int volatile current_pid = current -> pid;
+  int volatile current_priority = current -> priority;
+  int volatile pid;
+  if(current -> age != current -> max_age && current_pid != -1){
+    return current_pid;
+  }
+  if(get_running_processes_number() == 0){
+    return -1;
+  }
+
+  pid = get_next_lowest_priority(current_pid,current_priority);
+  if(pid == -1){
+    pid = get_highest_priority(current_pid);
+  }
+
+  
+  return pid;
+}
+
+int get_highest_priority(){
+  int volatile best = -1;
+  int volatile pid = -1;
   for (int i = 0; i < total_processes; i++)
   {
     if(pcb[i].available == 0){
-      if(pcb[i].priority - pcb[i].age >= best){
-        best = pcb[i].priority - pcb[i].age;
+      if(pcb[i].priority >= best){
+        best = pcb[i].priority;
         pid = i;
       }
     }
   }
-  if(best == 0) return -1;
-  else return pid;
+  return pid;
 }
 
-int create_process_child(uint32_t parent_pid, ctx_t* ctx){
-  volatile uint32_t pid = get_available_pid();
+int get_next_lowest_priority(int current_pid,int last_prior){
+  int volatile best = -1;
+  int volatile pid = -1;
+
+  for (int i = 0; i < total_processes; i++)
+  {
+    if(pcb[i].available == 0){
+      if(pcb[i].priority == last_prior){
+        if(pcb[i].priority <= last_prior && pcb[i].priority >= best && i < current_pid){
+          best = pcb[i].priority;
+          pid = i;
+        }
+      }else{
+        if(pcb[i].priority <= last_prior && pcb[i].priority >= best){
+          best = pcb[i].priority;
+          pid = i;
+        }
+      }  
+    }
+  }
+  return pid;
+}
+
+int create_process_child(uint32_t parent_pid, ctx_t* ctx,int x){
+  uint32_t volatile  pid = get_available_pid();
 
   if(pid != -2){
         memcpy( (void*) stack_locations[pid] - 0x00001000,(void*)  &tos_shell -0x00001000, 0x00001000);
         memcpy( &pcb[ pid ].ctx, ctx, sizeof( ctx_t ) );
         pcb[ pid ].pid      = pid;
-        pcb[ pid ].priority =   7;
+        pcb[ pid ].priority =   prior[x];
         pcb[ pid ].ctx.gpr[0] = -1;
         pcb[ pid ].ctx.cpsr = 0x50;
         pcb[ pid ].ctx.sp = stack_locations[pid];
         pcb[ pid ].available = 0;
         pcb[ pid ].age = 0;
-        pcb[ pid ].max_age = 6;
+        pcb[ pid ].max_age = prior[x];
         return pid;
   }else{
     return -2;
@@ -281,10 +361,10 @@ void initialise_pcb_shell(){
   pcb_shell.ctx.cpsr = 0x50;
   pcb_shell.ctx.pc   = ( uint32_t ) entry_shell ;
   pcb_shell.ctx.sp   = ( uint32_t ) &tos_shell ;
-  pcb_shell.priority  = 7;
+  pcb_shell.priority  = 10 + pid;
   pcb_shell.available = 0;
   pcb_shell.age = 0;
-  pcb_shell.max_age = 6;
+  pcb_shell.max_age = 9 + pid;
 }
 
 void initialise_input(){
